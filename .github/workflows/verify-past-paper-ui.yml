@@ -21,7 +21,10 @@ jobs:
           const context=await browser.newContext();
           await context.addInitScript(()=>{window.fetch=async url=>new Response(JSON.stringify(String(url).includes('/api/_auth/me')?{name:'资料验证',email:'ui-check@example.com'}:{state:null}),{status:200,headers:{'Content-Type':'application/json'}});localStorage.setItem('peak-english-token','ui-check-token');localStorage.setItem('peak-english-state',JSON.stringify({target:'IELTS',tasks:{},mistakes:[],plan:{1:[false,false,false],2:[false,false,false],3:[false,false]},custom:[],vocab:[],draft:'',papers:{},profile:{name:'资料验证',email:'ui-check@example.com',registered:true,target:'IELTS',level:'IELTS 6.5',focus:'reading',dailyMinutes:45,days:42}}))});
           const page=await context.newPage();
+          const pageErrors=[];page.on('pageerror',error=>pageErrors.push(error.message));
           await page.goto('https://22-h743.github.io/cola-pages/peak-english/',{waitUntil:'domcontentloaded',timeout:60000});
+          await page.waitForTimeout(500);
+          if(pageErrors.length) throw new Error('Published page script error: '+pageErrors.join(' | '));
           await page.locator('[data-route="papers"]').click();
           await page.getByRole('heading',{name:'近 5 年真题演练'}).waitFor({timeout:30000});
           for (const year of ['2025','2024','2023','2022','2021']) await page.getByRole('button',{name:year,exact:true}).waitFor();
