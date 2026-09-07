@@ -1,0 +1,66 @@
+name: Browser verify Peak English production
+on:
+  workflow_dispatch:
+
+jobs:
+  browser-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Chromium
+        run: npx --yes playwright@1.55.0 install --with-deps chromium
+      - name: Run production browser flow
+        env:
+          URL: https://cola-dispatch.marswave-543.workers.dev/peak-english-5c6b72/
+          ADMIN_EMAIL: admin@peakenglish.site
+          ADMIN_PASSWORD: ${{ secrets.PEAK_ADMIN_PASSWORD }}
+          LEARNER_EMAIL: browser-check@peakenglish.test
+          LEARNER_PASSWORD: ${{ secrets.PEAK_BROWSER_PASSWORD }}
+        run: |
+          cat > verify.mjs <<'EOF'
+          import { chromium } from 'playwright';
+          const base = process.env.URL;
+          const browser = await chromium.launch({headless:true});
+          const learner = await browser.newContext();
+          const page = await learner.newPage();
+          await page.goto(base, {waitUntil:'networkidle', timeout:60000});
+          await page.getByRole('heading', {name:/不是刷题更多/}).waitFor({timeout:30000});
+          await page.getByRole('button', {name:'创建学习档案'}).click();
+          await page.locator('#auth-name').fill('浏览器验证学习者');
+          await page.locator('#auth-email').fill(process.env.LEARNER_EMAIL);
+          await page.locator('#auth-password').fill(process.env.LEARNER_PASSWORD);
+          await page.getByRole('button', {name:'创建账号并生成计划'}).click();
+          const error = page.locator('#auth-error');
+          await Promise.race([
+            page.getByRole('heading', {name:/早上好，浏览器验证学习者/}).waitFor({timeout:30000}),
+            error.filter({hasText:/./}).waitFor({timeout:30000}).then(async()=>{throw new Error('Registration UI error: '+await error.textContent())})
+          ]);
+          await page.locator('[data-task="listening"]').click();
+          await page.waitForTimeout(1200);
+          const restored = await browser.newContext();
+          const restoredPage = await restored.newPage();
+          await restoredPage.goto(base, {waitUntil:'networkidle', timeout:60000});
+          await restoredPage.getByRole('button', {name:'登录'}).click();
+          await restoredPage.locator('#auth-email').fill(process.env.LEARNER_EMAIL);
+          await restoredPage.locator('#auth-password').fill(process.env.LEARNER_PASSWORD);
+          await restoredPage.getByRole('button', {name:'登录并同步数据'}).click();
+          await restoredPage.getByRole('heading', {name:/早上好，浏览器验证学习者/}).waitFor({timeout:30000});
+          const listening = restoredPage.locator('[data-task="listening"]');
+          if ((await listening.textContent()).trim() !== '✓') throw new Error('Cross-device task state did not restore');
+          const admin = await browser.newContext();
+          const adminPage = await admin.newPage();
+          await adminPage.goto(base, {waitUntil:'networkidle', timeout:60000});
+          await adminPage.getByRole('button', {name:'登录'}).click();
+          await adminPage.locator('#auth-email').fill(process.env.ADMIN_EMAIL);
+          await adminPage.locator('#auth-password').fill(process.env.ADMIN_PASSWORD);
+          await adminPage.getByRole('button', {name:'登录并同步数据'}).click();
+          await adminPage.getByRole('heading', {name:/早上好，Peak English 管理员/}).waitFor({timeout:30000});
+          await adminPage.locator('#admin-link').click();
+          await adminPage.getByText(process.env.LEARNER_EMAIL).waitFor({timeout:30000});
+          console.log('Browser flow passed: register, task sync to fresh browser context, administrator login and learner visibility.');
+          await browser.close();
+          EOF
+          node verify.mjs
