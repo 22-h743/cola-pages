@@ -1,0 +1,35 @@
+name: Verify past-paper UI
+on:
+  workflow_dispatch:
+jobs:
+  paper-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: |
+          npm init -y
+          npm install playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Verify published past-paper practice interface
+        run: |
+          cat > verify-paper.mjs <<'EOF'
+          import { chromium } from 'playwright';
+          const browser=await chromium.launch({headless:true});
+          const context=await browser.newContext();
+          await context.addInitScript(()=>{localStorage.setItem('peak-english-token','ui-check-token');localStorage.setItem('peak-english-state',JSON.stringify({target:'IELTS',tasks:{},mistakes:[],plan:{1:[false,false,false],2:[false,false,false],3:[false,false]},custom:[],vocab:[],draft:'',papers:{},profile:{name:'资料验证',email:'ui-check@example.com',registered:true,target:'IELTS',level:'IELTS 6.5',focus:'reading',dailyMinutes:45,days:42}}))});
+          const page=await context.newPage();
+          await page.goto('https://22-h743.github.io/cola-pages/peak-english/',{waitUntil:'domcontentloaded',timeout:60000});
+          await page.locator('[data-route="papers"]').click();
+          await page.getByRole('heading',{name:'近 5 年真题演练'}).waitFor({timeout:30000});
+          for (const year of ['2025','2024','2023','2022','2021']) await page.getByRole('button',{name:year,exact:true}).waitFor();
+          await page.locator('#paper-file').setInputFiles({name:'CET6-2025-authorized.txt',mimeType:'text/plain',buffer:Buffer.from('Authorized material\nListening section practice.')});
+          await page.getByText(/已导入：CET6-2025-authorized.txt/).waitFor({timeout:30000});
+          await page.getByRole('button',{name:'开始 90 分钟计时'}).click();
+          await page.getByRole('button',{name:'演练计时中'}).waitFor({timeout:30000});
+          console.log('Published browser UI passed: 2021–2025 selectors, file import, persisted exercise view, and timer start.');
+          await browser.close();
+          EOF
+          node verify-paper.mjs
