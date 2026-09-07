@@ -20,7 +20,7 @@ jobs:
           URL: https://cola-dispatch.marswave-543.workers.dev/peak-english-5c6b72/
           ADMIN_EMAIL: admin@peakenglish.site
           ADMIN_PASSWORD: ${{ secrets.PEAK_ADMIN_PASSWORD }}
-          LEARNER_EMAIL: browser-check@peakenglish.test
+          LEARNER_EMAIL: browser-check-${{ github.run_id }}@peakenglish.test
           LEARNER_PASSWORD: ${{ secrets.PEAK_BROWSER_PASSWORD }}
         run: |
           cat > verify.mjs <<'EOF'
@@ -42,6 +42,10 @@ jobs:
             error.filter({hasText:/./}).waitFor({timeout:30000}).then(async()=>{throw new Error('Registration UI error: '+await error.textContent())})
           ]);
           await page.locator('[data-task="listening"]').click();
+          await page.locator('[data-route="papers"]').click();
+          await page.getByRole('heading', {name:'近 5 年真题演练'}).waitFor({timeout:30000});
+          await page.locator('#paper-file').setInputFiles({name:'IELTS-2025-authorized.txt', mimeType:'text/plain', buffer:Buffer.from('Authorized practice material\nQuestion 1: Demonstrate controlled import and timed practice.')});
+          await page.getByText(/已导入：IELTS-2025-authorized.txt/).waitFor({timeout:30000});
           await page.waitForTimeout(1200);
           const restored = await browser.newContext();
           const restoredPage = await restored.newPage();
@@ -53,6 +57,8 @@ jobs:
           await restoredPage.getByRole('heading', {name:/早上好，浏览器验证学习者/}).waitFor({timeout:30000});
           const listening = restoredPage.locator('[data-task="listening"]');
           if ((await listening.textContent()).trim() !== '✓') throw new Error('Cross-device task state did not restore');
+          await restoredPage.locator('[data-route="papers"]').click();
+          await restoredPage.getByText(/已导入：IELTS-2025-authorized.txt/).waitFor({timeout:30000});
           const admin = await browser.newContext();
           const adminPage = await admin.newPage();
           await adminPage.goto(base, {waitUntil:'networkidle', timeout:60000});
