@@ -31,7 +31,7 @@ jobs:
           const page = await learner.newPage();
           await page.goto(base, {waitUntil:'networkidle', timeout:60000});
           await page.getByRole('heading', {name:/不是刷题更多/}).waitFor({timeout:30000});
-          await page.getByRole('button', {name:'创建学习档案'}).click();
+          await page.locator('#welcome-register').click();
           await page.locator('#auth-name').fill('浏览器验证学习者');
           await page.locator('#auth-email').fill(process.env.LEARNER_EMAIL);
           await page.locator('#auth-password').fill(process.env.LEARNER_PASSWORD);
