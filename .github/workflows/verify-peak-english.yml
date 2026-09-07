@@ -1,0 +1,45 @@
+name: Verify Peak English production
+on:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Register or log in the administrator
+        env:
+          URL: https://cola-dispatch.marswave-543.workers.dev/peak-english-5c6b72
+          EMAIL: admin@peakenglish.site
+          PASSWORD: ${{ secrets.PEAK_ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          register_body=$(jq -cn --arg name 'Peak English 管理员' --arg email "$EMAIL" --arg password "$PASSWORD" '{name:$name,email:$email,password:$password}')
+          auth=$(curl -sS -X POST "$URL/api/_auth/register" -H 'Content-Type: application/json' --data "$register_body" || true)
+          token=$(jq -r '.token // empty' <<<"$auth")
+          if [ -z "$token" ]; then
+            login_body=$(jq -cn --arg email "$EMAIL" --arg password "$PASSWORD" '{email:$email,password:$password}')
+            auth=$(curl -fsS -X POST "$URL/api/_auth/login" -H 'Content-Type: application/json' --data "$login_body")
+            token=$(jq -r '.token // empty' <<<"$auth")
+          fi
+          test -n "$token"
+          printf '%s' "$token" > /tmp/peak-token
+      - name: Save and restore an authenticated study state
+        env:
+          URL: https://cola-dispatch.marswave-543.workers.dev/peak-english-5c6b72
+        run: |
+          set -euo pipefail
+          token=$(cat /tmp/peak-token)
+          state=$(jq -cn '{state:{target:"IELTS",tasks:{listening:true},mistakes:[],plan:{"1":[true,false,false],"2":[false,false,false],"3":[false,false]},custom:[],vocab:[0],draft:"production sync check",speed:0.85,profile:{name:"Peak English 管理员",email:"admin@peakenglish.site",registered:true,target:"IELTS",level:"IELTS 6.5",focus:"writing",dailyMinutes:45,days:42}}}')
+          code=$(curl -sS -o /tmp/saved.json -w '%{http_code}' -X PUT "$URL/api/state" -H 'Content-Type: application/json' -H "Authorization: Bearer $token" --data "$state")
+          test "$code" = 200
+          restored=$(curl -fsS "$URL/api/state" -H "Authorization: Bearer $token")
+          jq -e '.state | fromjson | .draft == "production sync check" and .tasks.listening == true and .profile.email == "admin@peakenglish.site"' <<<"$restored" >/dev/null
+      - name: Verify administrator access
+        env:
+          URL: https://cola-dispatch.marswave-543.workers.dev/peak-english-5c6b72
+        run: |
+          set -euo pipefail
+          token=$(cat /tmp/peak-token)
+          learners=$(curl -fsS "$URL/api/admin/learners" -H "Authorization: Bearer $token")
+          jq -e '.total >= 1 and ([.learners[].email] | index("admin@peakenglish.site")) != null' <<<"$learners" >/dev/null
+          echo 'Production auth, state persistence, state restore, and administrator access passed.'
