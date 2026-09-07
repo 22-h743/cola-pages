@@ -19,7 +19,7 @@ jobs:
           import { chromium } from 'playwright';
           const browser=await chromium.launch({headless:true});
           const context=await browser.newContext();
-          await context.addInitScript(()=>{localStorage.setItem('peak-english-token','ui-check-token');localStorage.setItem('peak-english-state',JSON.stringify({target:'IELTS',tasks:{},mistakes:[],plan:{1:[false,false,false],2:[false,false,false],3:[false,false]},custom:[],vocab:[],draft:'',papers:{},profile:{name:'资料验证',email:'ui-check@example.com',registered:true,target:'IELTS',level:'IELTS 6.5',focus:'reading',dailyMinutes:45,days:42}}))});
+          await context.addInitScript(()=>{window.fetch=async url=>new Response(JSON.stringify(String(url).includes('/api/_auth/me')?{name:'资料验证',email:'ui-check@example.com'}:{state:null}),{status:200,headers:{'Content-Type':'application/json'}});localStorage.setItem('peak-english-token','ui-check-token');localStorage.setItem('peak-english-state',JSON.stringify({target:'IELTS',tasks:{},mistakes:[],plan:{1:[false,false,false],2:[false,false,false],3:[false,false]},custom:[],vocab:[],draft:'',papers:{},profile:{name:'资料验证',email:'ui-check@example.com',registered:true,target:'IELTS',level:'IELTS 6.5',focus:'reading',dailyMinutes:45,days:42}}))});
           const page=await context.newPage();
           await page.goto('https://22-h743.github.io/cola-pages/peak-english/',{waitUntil:'domcontentloaded',timeout:60000});
           await page.locator('[data-route="papers"]').click();
