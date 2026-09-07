@@ -1,0 +1,1 @@
+# Cola Pages`nShared GitHub Pages hosting for static sites deployed from Cola.`n
