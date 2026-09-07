@@ -10,8 +10,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Install Chromium
-        run: npx --yes playwright@1.55.0 install --with-deps chromium
+      - name: Install Playwright and Chromium
+        run: |
+          npm init -y
+          npm install playwright@1.55.0
+          npx playwright install --with-deps chromium
       - name: Run production browser flow
         env:
           URL: https://cola-dispatch.marswave-543.workers.dev/peak-english-5c6b72/
